@@ -67,6 +67,10 @@ void formatted_append(char *buffer, size_t len, char *width_fmt, char *fmt, ...)
 
 	va_end(args);
 
+#ifdef SJA1105_KMOD_BUILD
+	kfree(temp_buf);
+#else
 	free(temp_buf);
+#endif
 }
 
