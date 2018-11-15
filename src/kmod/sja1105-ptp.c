@@ -4,6 +4,7 @@
  * Copyright (c) 2018, NXP Semiconductors
  */
 
+#include <linux/version.h>
 #include <linux/time64.h>
 #include "sja1105.h"
 
@@ -578,6 +579,26 @@ static int sja1105_ptp_adjfine(struct ptp_clock_info *ptp, long scaled_ppm)
 	return sja1105_ptp_write_reg(priv, ptpclkrate_addr, &ptpclkrate, 4);
 }
 
+#if KERNEL_VERSION(4, 9, 0) >= LINUX_VERSION_CODE
+static int sja1105_ptp_adjfreq(struct ptp_clock_info *ptp, s32 delta)
+{
+	s64 scaled_ppm;
+
+	/*
+	 * Convert the ppb value back into ppm + 16 bit fractional field
+	 * (derived from scaled_ppm_to_ppb()).
+	 *
+	 * scaled_ppm = ppb * 2^16 / 1000
+	 * simplifies to
+	 * scaled_ppm = ppb * 2^13 / 125
+	 */
+	scaled_ppm = delta << 13;
+	scaled_ppm = div_s64(scaled_ppm, 125);
+
+	return sja1105_ptp_adjfine(ptp, (long)scaled_ppm);
+}
+#endif
+
 /* Write to PTPCLKVAL while PTPCLKADD is 1 */
 static int sja1105_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
 {
@@ -613,7 +634,11 @@ static const struct ptp_clock_info sja1105_ptp_caps = {
 	.owner     = THIS_MODULE,
 	.name      = "SJA1105 PHC",
 	.max_adj   = SJA1105_MAX_ADJ,
+#if KERNEL_VERSION(4, 9, 0) >= LINUX_VERSION_CODE
+	.adjfreq   = sja1105_ptp_adjfreq,
+#else
 	.adjfine   = sja1105_ptp_adjfine,
+#endif
 	.adjtime   = sja1105_ptp_adjtime,
 	.gettime64 = sja1105_ptp_gettime,
 	.settime64 = sja1105_ptp_settime,
