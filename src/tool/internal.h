@@ -32,9 +32,20 @@
 #define _SJA1105_TOOL_INTERNAL
 
 #include <common.h>
-#include <lib/include/staging-area.h>
 #include <lib/include/static-config.h>
 #include <lib/include/gtable.h>
+
+struct sja1105_staging_area {
+	struct sja1105_static_config static_config;
+	/* More configuration tables? TBD */
+};
+
+enum sja1105_default_staging_area {
+	LS1021ATSN = 0,
+};
+
+int sja1105_default_staging_area(struct sja1105_staging_area*,
+                                 enum sja1105_default_staging_area);
 
 struct general_config {
 	char *staging_area;
