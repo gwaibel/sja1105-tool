@@ -518,7 +518,9 @@ static int sja1105_ptp_gettime(struct ptp_clock_info *ptp,
 	else
 		ptpclkval_addr = SJA1105PQRS_PTPCLKVAL_ADDR;
 
+	mutex_lock(&priv->lock);
 	rc = sja1105_ptp_read_reg(priv, ptpclkval_addr, &ptpclkval, 8);
+	mutex_unlock(&priv->lock);
 	if (rc < 0) {
 		dev_err(&priv->spi_dev->dev, "failed to read ptpclkval\n");
 		goto out;
@@ -542,6 +544,7 @@ static int sja1105_ptp_settime(struct ptp_clock_info *ptp,
 	                                   sja1105_spi_private, ptp_caps);
 	int rc;
 
+	mutex_lock(&priv->lock);
 	rc = sja1105_ptp_add_mode_set(priv, PTP_SET_MODE);
 	if (rc < 0) {
 		dev_err(&priv->spi_dev->dev, "Failed configuring set mode for ptp clk\n");
@@ -549,6 +552,7 @@ static int sja1105_ptp_settime(struct ptp_clock_info *ptp,
 	}
 	rc = sja1105_ptp_clk_write(priv, ts);
 out:
+	mutex_unlock(&priv->lock);
 	return rc;
 }
 
@@ -560,6 +564,7 @@ static int sja1105_ptp_adjfine(struct ptp_clock_info *ptp, long scaled_ppm)
 	u64 device_id = priv->device_id;
 	u64 ptpclkrate_addr;
 	u64 ptpclkrate;
+	int rc;
 
 	if (IS_ET(device_id))
 		ptpclkrate_addr = SJA1105ET_PTPCLKRATE_ADDR;
@@ -571,7 +576,10 @@ static int sja1105_ptp_adjfine(struct ptp_clock_info *ptp, long scaled_ppm)
 	else
 		ptpclkrate = (1ull << 31) | scaled_ppm;
 
-	return sja1105_ptp_write_reg(priv, ptpclkrate_addr, &ptpclkrate, 4);
+	mutex_lock(&priv->lock);
+	rc = sja1105_ptp_write_reg(priv, ptpclkrate_addr, &ptpclkrate, 4);
+	mutex_unlock(&priv->lock);
+	return rc;
 }
 
 #if KERNEL_VERSION(4, 9, 0) >= LINUX_VERSION_CODE
@@ -602,6 +610,7 @@ static int sja1105_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
 	struct timespec64 ts = ns_to_timespec64(delta);
 	int rc;
 
+	mutex_lock(&priv->lock);
 	rc = sja1105_ptp_add_mode_set(priv, PTP_ADD_MODE);
 	if (rc < 0) {
 		dev_err(&priv->spi_dev->dev, "failed configuring add mode for ptp clk\n");
@@ -609,6 +618,7 @@ static int sja1105_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
 	}
 	rc = sja1105_ptp_clk_write(priv, &ts);
 out:
+	mutex_unlock(&priv->lock);
 	return rc;
 }
 
@@ -618,9 +628,13 @@ static int sja1105_ptp_enable(struct ptp_clock_info *ptp,
 	struct sja1105_spi_private *priv = container_of(ptp, struct
 	                                   sja1105_spi_private, ptp_caps);
 	struct timespec64 now;
+	int rc;
 
-	if (sja1105_ptp_reset(priv) < 0)
-		return -EIO;
+	mutex_lock(&priv->lock);
+	rc = sja1105_ptp_reset(priv) < 0;
+	mutex_unlock(&priv->lock);
+	if (rc < 0)
+		return  -EIO;
 	getnstimeofday64(&now);
 	return sja1105_ptp_settime(&priv->ptp_caps, &now);
 }
