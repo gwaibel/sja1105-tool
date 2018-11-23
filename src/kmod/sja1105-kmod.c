@@ -98,9 +98,10 @@ static void sja1105_patch_mac_mii_settings(struct sja1105_spi_private *priv)
 			if (port->dt_xmii_mode == -1)
 				mii->phy_mac[port->index] = XMII_PHY;
 
-			/* Retrieve static speed from fixed-link property */
-			mac->speed = sja1105_get_speed_cfg(
-			             sja1105_port_get_speed(port));
+			/* Retrieve static speed from fixed-link property
+			 * but let sja1105_netdev_adjust_link callback
+			 * actually set the speed */
+			mac->speed = SJA1105_SPEED_AUTO;
 		} else {
 			/* phy-handle present => put port in MAC mode */
 			if (port->dt_xmii_mode == -1)
@@ -415,7 +416,7 @@ static int sja1105_probe(struct spi_device *spi)
 		goto err_out;
 
 	/* Upload static configuration */
-	rc = sja1105_static_config_flush(priv);
+	rc = sja1105_static_config_flush_ports_disabled(priv);
 	if (rc < 0)
 		goto err_out;
 	dev_dbg(dev, "Uploaded static configuration to device\n");
